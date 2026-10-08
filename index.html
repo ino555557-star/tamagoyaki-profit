@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="玉子焼き利益計算">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>🥚 玉子焼き利益計算</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f5f7;color:#171717;font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif}
+.app{max-width:760px;margin:auto;padding:18px 14px 40px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+h1{font-size:22px;margin:0}.sub{color:#777;font-size:12px;margin-top:3px}
+button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer}.install{background:#111;color:#fff}
+.panel{background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 3px 15px #0000000b}
+.tabs{display:flex;gap:7px;overflow:auto}.tab{background:#eee;white-space:nowrap}.tab.active{background:#111;color:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:12px;color:#666;margin-bottom:5px}
+input{width:100%;border:1px solid #ddd;border-radius:10px;padding:12px;font-size:16px;background:#fff}
+.presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.preset{background:#f0f0f0}
+.results{display:grid;grid-template-columns:1fr 1fr;gap:10px}.result{background:#f2f4f7;border-radius:14px;padding:13px}.result .k{font-size:12px;color:#666}.result .v{font-size:21px;font-weight:800;margin-top:4px}
+.big{background:#111;color:#fff}.big .k{color:#bbb}.big .v{font-size:27px}
+.bar{height:12px;background:#e8e8e8;border-radius:99px;overflow:hidden;margin-top:8px}.bar>div{height:100%;background:#111;width:0}
+.note{font-size:12px;color:#777;line-height:1.6}.hidden{display:none}
+@media(max-width:560px){.grid,.results{grid-template-columns:1fr 1fr}.grid .full{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><div><h1>🥚 玉子焼き利益計算</h1><div class="sub">販売・業務用の利益をすぐ確認</div></div><button id="install" class="install hidden">ホーム画面に追加</button></div>
+
+<div class="panel">
+<div class="tabs">
+<button class="tab active" data-type="350">350ml</button>
+<button class="tab" data-type="300">300ml</button>
+<button class="tab" data-type="1800">業務用 1.8L</button>
+</div>
+</div>
+
+<div class="panel">
+<div class="grid">
+<div class="field"><label>容量（ml）</label><input id="vol" type="number" value="350"></div>
+<div class="field"><label>1本の原価（円）</label><input id="cost" type="number" value="400"></div>
+<div class="field"><label>販売価格（円）</label><input id="price" type="number" value="600"></div>
+<div class="field"><label>月間販売本数</label><input id="qty" type="number" value="1000"></div>
+<div class="field"><label>卵1個あたり使用量（ml）</label><input id="use" type="number" value="15"></div>
+<div class="field"><label>月間固定費（円）</label><input id="fixed" type="number" value="0"></div>
+</div>
+<div class="presets">
+<button class="preset" data-q="1000">1,000本</button>
+<button class="preset" data-q="3000">3,000本</button>
+<button class="preset" data-q="5000">5,000本</button>
+<button class="preset" data-q="10000">10,000本</button>
+</div>
+</div>
+
+<div class="results">
+<div class="result"><div class="k">1本あたり利益</div><div class="v" id="unit">-</div></div>
+<div class="result"><div class="k">利益率</div><div class="v" id="rate">-</div></div>
+<div class="result"><div class="k">月間売上</div><div class="v" id="sales">-</div></div>
+<div class="result"><div class="k">月間粗利益</div><div class="v" id="gross">-</div></div>
+<div class="result"><div class="k">固定費</div><div class="v" id="expense">-</div></div>
+<div class="result big"><div class="k">月間利益</div><div class="v" id="profit">-</div></div>
+<div class="result"><div class="k">1本で作れる卵焼き</div><div class="v" id="eggs">-</div></div>
+<div class="result"><div class="k">月間の卵焼き数</div><div class="v" id="totaleggs">-</div></div>
+</div>
+
+<div class="panel">
+<b>📊 固定費を回収するまで</b>
+<div class="bar"><div id="bar"></div></div>
+<div class="note" id="break">-</div>
+</div>
+
+<div class="panel note">
+<b>計算方法</b><br>
+1本利益＝販売価格−原価。月間利益＝1本利益×販売本数−固定費。<br>
+損益分岐点＝固定費÷1本利益。すべて入力値を変更すると自動更新します。
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString("ja-JP")+"円";
+function calc(){
+ const v=+$("vol").value||0,c=+$("cost").value||0,p=+$("price").value||0,q=+$("qty").value||0,u=+$("use").value||0,f=+$("fixed").value||0;
+ const unit=p-c, sales=p*q, gross=unit*q, profit=gross-f, rate=p?unit/p*100:0;
+ $("unit").textContent=fmt(unit);$("rate").textContent=rate.toFixed(1)+"%";
+ $("sales").textContent=fmt(sales);$("gross").textContent=fmt(gross);$("expense").textContent=fmt(f);$("profit").textContent=fmt(profit);
+ const eggs=u?Math.floor(v/u):0;
+ $("eggs").textContent=eggs.toLocaleString()+"個";$("totaleggs").textContent=(eggs*q).toLocaleString()+"個";
+ const be=unit>0?Math.ceil(f/unit):Infinity;
+ $("break").textContent=Number.isFinite(be)?`損益分岐点：約 ${be.toLocaleString()}本（現在の販売本数 ${q.toLocaleString()}本）`:"販売価格が原価以下のため損益分岐点を計算できません";
+ const pct=Number.isFinite(be)&&q>0?Math.min(100,q/be*100):0;$("bar").style.width=pct+"%";
+ localStorage.setItem("tamagoyakiData",JSON.stringify({v,c,p,q,u,f}));
+}
+document.querySelectorAll("input").forEach(x=>x.addEventListener("input",calc));
+document.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{$("qty").value=b.dataset.q;calc()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+ const t=b.dataset.type;
+ if(t==="350"){$("vol").value=350;$("cost").value=400;$("price").value=600}
+ if(t==="300"){$("vol").value=300;$("cost").value=350;$("price").value=550}
+ if(t==="1800"){$("vol").value=1800;$("cost").value=1500;$("price").value=1800}
+ calc();
+});
+try{const d=JSON.parse(localStorage.getItem("tamagoyakiData"));if(d){$("vol").value=d.v;$("cost").value=d.c;$("price").value=d.p;$("qty").value=d.q;$("use").value=d.u;$("fixed").value=d.f}}catch(e){}
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("install").classList.remove("hidden")});
+$("install").onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;$("install").classList.add("hidden")}};
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"));
+calc();
+</script>
+</body></html>
